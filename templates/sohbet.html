@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="sohbet-ust">
+  <a href="{{ url_for('grup', grup_id=grup.id) }}" class="sohbet-geri">← {{ grup.ad }}</a>
+  <span class="sohbet-uye">{{ uye_sayisi }} üye</span>
+</div>
+
+<div class="card sohbet-kart">
+  <h2 style="margin-bottom:10px;">💬 Sohbet</h2>
+
+  <div id="mesajListesi" class="mesaj-listesi" aria-live="polite">
+    <p id="bosMesaj" class="sohbet-bos" {% if mesajlar %}hidden{% endif %}>
+      Henüz mesaj yok. İlk mesajı sen yaz! ⚽
+    </p>
+  </div>
+
+  <form id="mesajFormu" class="mesaj-formu" autocomplete="off">
+    <textarea id="mesajKutusu" rows="1" maxlength="{{ max_uzunluk }}"
+              placeholder="Mesaj yaz…" aria-label="Mesaj"></textarea>
+    <button type="submit" class="btn" id="gonderBtn">Gönder</button>
+  </form>
+  <p id="sohbetHata" class="sohbet-hata" hidden></p>
+</div>
+
+<style>
+.sohbet-ust{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+.sohbet-geri{color:var(--navy); font-weight:600; text-decoration:none;}
+.sohbet-uye{font-size:0.85em; color:var(--muted);}
+.sohbet-kart{display:flex; flex-direction:column;}
+.mesaj-listesi{height:min(60vh, 560px); overflow-y:auto; display:flex; flex-direction:column; gap:8px;
+  padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px;}
+.sohbet-bos{margin:auto; color:var(--muted); font-size:0.9em; text-align:center;}
+.mesaj{max-width:80%; padding:8px 12px; border-radius:14px; background:#fff; border:1px solid #e2e8f0;
+  align-self:flex-start; word-wrap:break-word; overflow-wrap:anywhere;}
+.mesaj.benim{align-self:flex-end; background:var(--navy); color:#fff; border-color:var(--navy);}
+.mesaj-ust{display:flex; gap:8px; align-items:baseline; font-size:0.75em; margin-bottom:2px;}
+.mesaj-ad{font-weight:700; color:var(--gold);}
+.mesaj.benim .mesaj-ad{display:none;}
+.mesaj-saat{color:#94a3b8;}
+.mesaj.benim .mesaj-saat{color:#cbd5e1;}
+.mesaj-icerik{white-space:pre-wrap; font-size:0.95em; line-height:1.35;}
+.mesaj-sil{background:none; border:0; padding:0; margin-left:auto; cursor:pointer; color:inherit; opacity:.5; font-size:0.95em;}
+.mesaj-sil:hover{opacity:1;}
+.mesaj-formu{display:flex; gap:8px; margin-top:10px; align-items:flex-end;}
+.mesaj-formu textarea{flex:1; resize:none; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px;
+  font:inherit; max-height:120px; margin:0;}
+.mesaj-formu .btn{padding:10px 16px;}
+.sohbet-hata{color:#b91c1c; font-size:0.85em; margin:6px 0 0;}
+</style>
+
+<script>
+(function(){
+  var GRUP = {{ grup.id }};
+  var BEN = {{ current_user.id }};
+  var YETKILI = {{ 'true' if (current_user.admin or grup.kurucu_id == current_user.id) else 'false' }};
+  var liste = document.getElementById('mesajListesi');
+  var bos = document.getElementById('bosMesaj');
+  var form = document.getElementById('mesajFormu');
+  var kutu = document.getElementById('mesajKutusu');
+  var btn = document.getElementById('gonderBtn');
+  var hata = document.getElementById('sohbetHata');
+  var sonId = 0;
+  var gorulen = {};
+
+  function altaYakinMi(){ return liste.scrollHeight - liste.scrollTop - liste.clientHeight < 80; }
+  function altaKaydir(){ liste.scrollTop = liste.scrollHeight; }
+
+  function mesajEkle(m){
+    if (gorulen[m.id]) return;
+    gorulen[m.id] = true;
+    sonId = Math.max(sonId, m.id);
+    bos.hidden = true;
+
+    var d = document.createElement('div');
+    d.className = 'mesaj' + (m.kullanici_id === BEN ? ' benim' : '');
+    d.dataset.id = m.id;
+
+    var ust = document.createElement('div'); ust.className = 'mesaj-ust';
+    var ad = document.createElement('span'); ad.className = 'mesaj-ad'; ad.textContent = m.kullanici_adi;
+    var saat = document.createElement('span'); saat.className = 'mesaj-saat'; saat.textContent = m.saat;
+    ust.appendChild(ad); ust.appendChild(saat);
+    if (m.kullanici_id === BEN || YETKILI) {
+      var sil = document.createElement('button'); sil.type = 'button'; sil.className = 'mesaj-sil';
+      sil.title = 'Mesajı sil'; sil.textContent = '🗑';
+      sil.addEventListener('click', function(){ mesajSil(m.id, d); });
+      ust.appendChild(sil);
+    }
+    var ic = document.createElement('div'); ic.className = 'mesaj-icerik'; ic.textContent = m.icerik;
+    d.appendChild(ust); d.appendChild(ic);
+    liste.appendChild(d);
+  }
+
+  function hataGoster(t){ hata.textContent = t; hata.hidden = !t; }
+
+  function mesajSil(id, el){
+    fetch('/grup/' + GRUP + '/sohbet/sil/' + id, {method:'POST', credentials:'same-origin'})
+      .then(function(r){ if (r.ok) { el.remove(); bos.hidden = !!liste.querySelector('.mesaj'); } });
+  }
+
+  function yenile(){
+    fetch('/grup/' + GRUP + '/sohbet/mesajlar?sonra=' + sonId, {credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(v){
+        if (!v) return;
+        var asagida = altaYakinMi();
+        v.mesajlar.forEach(mesajEkle);
+        // Başkasının sildiği mesajları kaldır
+        var mevcut = {}; v.mevcut_idler.forEach(function(i){ mevcut[i] = true; });
+        var enEski = v.mevcut_idler.length ? Math.min.apply(null, v.mevcut_idler) : Infinity;
+        liste.querySelectorAll('.mesaj').forEach(function(el){
+          var id = +el.dataset.id;
+          if (id >= enEski && !mevcut[id]) el.remove();
+        });
+        bos.hidden = !!liste.querySelector('.mesaj');
+        if (asagida && v.mesajlar.length) altaKaydir();
+      })
+      .catch(function(){});
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var icerik = kutu.value.trim();
+    if (!icerik) return;
+    btn.disabled = true; hataGoster('');
+    fetch('/grup/' + GRUP + '/sohbet/gonder', {
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({icerik: icerik})
+    }).then(function(r){ return r.json().then(function(v){ return {ok:r.ok, v:v}; }); })
+      .then(function(s){
+        if (!s.ok) { hataGoster(s.v.hata || 'Mesaj gönderilemedi.'); return; }
+        kutu.value = ''; kutu.style.height = '';
+        mesajEkle(s.v.mesaj); altaKaydir();
+      })
+      .catch(function(){ hataGoster('Bağlantı hatası, tekrar dene.'); })
+      .finally(function(){ btn.disabled = false; kutu.focus(); });
+  });
+
+  // Enter = gönder, Shift+Enter = yeni satır
+  kutu.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+  });
+  kutu.addEventListener('input', function(){
+    kutu.style.height = 'auto'; kutu.style.height = Math.min(kutu.scrollHeight, 120) + 'px';
+  });
+
+  {{ mesajlar | tojson }}.forEach(mesajEkle);
+  altaKaydir();
+
+  // Sekme açıkken 8 sn'de bir yeni mesajlara bak; sekme arka plandayken sunucuyu hiç yorma
+  function dongu(){ if (!document.hidden) yenile(); setTimeout(dongu, 8000); }
+  setTimeout(dongu, 8000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) yenile(); });
+})();
+</script>
+
+{% endblock %}

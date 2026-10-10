@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>🕘 Geçmiş Maçlar &amp; Tahminler — {{ grup.ad }}</h1>
+
+<p style="color:var(--muted); margin-top:-6px;">
+  Grubundaki herkesin, oynanmış (bitmiş) maçlara girdiği tahminleri burada görebilirsin.
+  <a href="{{ url_for('grup', grup_id=grup.id) }}">← Gruba dön</a>
+</p>
+
+{% if maclar %}
+  {% for mac in maclar %}
+    <div class="card">
+
+      <p style="font-size:0.75em; color:var(--gold); font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin:0 0 6px;">
+        {{ mac.lig }} {% if mac.hafta %}— Hafta {{ mac.hafta }}{% endif %}
+      </p>
+
+      <div class="teams">
+        <span>
+          {% set ev_fallback = takim_logo_url(mac.ev_sahibi) %}{% set ev_src = mac.ev_logo or ev_fallback %}{% if ev_src %}<img loading="lazy" class="logo" src="{{ ev_src }}" style="width:24px;height:24px;vertical-align:middle;margin-right:5px;"{% if ev_fallback and ev_fallback != ev_src %} onerror="this.onerror=null;this.src='{{ ev_fallback }}';"{% endif %}>{% endif %}
+          {{ mac.ev_sahibi }}
+        </span>
+        <span class="score-pill">{{ mac.ev_skor }} - {{ mac.deplasman_skor }}</span>
+        <span>
+          {{ mac.deplasman }}
+          {% set dep_fallback = takim_logo_url(mac.deplasman) %}{% set dep_src = mac.deplasman_logo or dep_fallback %}{% if dep_src %}<img loading="lazy" class="logo" src="{{ dep_src }}" style="width:24px;height:24px;vertical-align:middle;margin-left:5px;"{% if dep_fallback and dep_fallback != dep_src %} onerror="this.onerror=null;this.src='{{ dep_fallback }}';"{% endif %}>{% endif %}
+        </span>
+      </div>
+
+      <p style="font-size:0.85em; color:#64748b; margin-top:5px;">
+        🕒 {% if mac.baslangic %}{{ mac.baslangic | tr_saat }}{% else %}Tarih Belirtilmemiş{% endif %}
+      </p>
+
+      <div style="margin-top:12px;">
+        <p style="font-size:0.85em; font-weight:bold; color:#475569; margin-bottom:6px;">
+          👥 Herkesin Tahmini:
+        </p>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          {% set mac_tahminleri = tahmin_matrisi.get(mac.id, {}) %}
+          {% for member in members %}
+            {% set member_tahmin = mac_tahminleri.get(member.kullanici_id) %}
+            <div style="font-size:0.85em; display:flex; justify-content:space-between; background:#f8fafc; padding:6px 10px; border-radius:6px;">
+              <span>{{ member.kullanici.kullanici_adi }}</span>
+              <span>
+                {% if member_tahmin %}
+                  <strong>{{ member_tahmin.ev_skor }} - {{ member_tahmin.deplasman_skor }}</strong>
+                  <span style="color:#16a34a; margin-left:5px;">(+{{ member_tahmin.puan }} Puan)</span>
+                {% else %}
+                  <span style="color:#cbd5e1;">Tahmin yapmadı</span>
+                {% endif %}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="card">
+    <p class="text-muted">Henüz bitmiş bir maç yok.</p>
+  </div>
+{% endif %}
+
+{% endblock %}

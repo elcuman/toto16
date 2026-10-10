@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>
+{{ grup.ad }}
+</h1>
+
+<div class="card">
+  <p>
+    <strong>Davet Kodu:</strong> {{ grup.davet_kodu }}
+  </p>
+
+  {% set davet_linki = request.url_root ~ 'katil/' ~ grup.davet_kodu %}
+  {% set davet_mesaji = "Şampiyonlar Tahmin Ligi'nde " ~ grup.ad ~ " grubuma katıl! Maç başlamadan tahminini gir, kazan ya da hesabını ver 😄 " ~ davet_linki %}
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+    <a class="btn" style="background:#2563eb;" href="{{ url_for('grup_sohbet', grup_id=grup.id) }}">
+      💬 Sohbet{% if mesaj_sayisi %} <span style="background:rgba(255,255,255,.25); border-radius:999px; padding:0 7px; margin-left:4px; font-size:12px;">{{ mesaj_sayisi }}</span>{% endif %}
+    </a>
+
+    <a
+      class="btn"
+      style="background:#25D366;"
+      target="_blank"
+      rel="noopener"
+      href="https://wa.me/?text={{ davet_mesaji | urlencode }}"
+    >
+      📲 WhatsApp'tan Davet Et
+    </a>
+
+    <button
+      class="btn"
+      style="background:#475569;"
+      onclick="navigator.clipboard.writeText('{{ davet_linki }}'); this.innerText='✅ Kopyalandı';"
+    >
+      🔗 Davet Linkini Kopyala
+    </button>
+
+    <a class="btn" style="background:#0f766e;" href="{{ url_for('grup_haftalik_liderlik', grup_id=grup.id) }}">
+      📅 Haftalık Zirve Listesi
+    </a>
+
+    <a class="btn" style="background:#7c3aed;" href="{{ url_for('grup_gecmis_maclar', grup_id=grup.id) }}">
+      🕘 Geçmiş Maçlar &amp; Tahminler
+    </a>
+  </div>
+
+  {% if grup.aciklama %}
+    <div style="margin-top: 12px; padding: 12px; background: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b; border: 1px solid #fef3c7;">
+      <p style="font-weight: bold; margin-bottom: 4px; font-size: 0.95em; color: #92400e;">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i> Grup Kuralları / Ceza Açıklaması:
+      </p>
+      <p style="margin: 0; font-size: 0.9em; color: #78350f; white-space: pre-line;">{{ grup.aciklama }}</p>
+    </div>
+  {% endif %}
+</div>
+
+
+<div class="card">
+
+<h2>
+  ⚽ Bu Haftanın Maçları ve Tahminler
+</h2>
+
+<p style="font-size:0.85em; color:var(--muted); margin-top:-8px;">
+  Lig seç, tahminlerini gir ve en altta <strong>"Tüm Tahminleri Kaydet"</strong>'e bas.
+  Tüm liglerdeki tahminlerin tek seferde kaydedilir.
+</p>
+
+{% if lig_sekmeleri %}
+
+<div class="lig-sekmeler" role="tablist">
+  {% for s in lig_sekmeleri %}
+  <button type="button" role="tab" class="lig-sekme{% if s.kod == varsayilan_sekme %} aktif{% endif %}"
+          data-sekme="{{ s.kod }}" aria-selected="{{ 'true' if s.kod == varsayilan_sekme else 'false' }}">
+    {{ s.ad }}
+    <span class="lig-sekme-sayi">{{ s.maclar|length }}</span>
+  </button>
+  {% endfor %}
+</div>
+
+<form method="POST" action="{{ url_for('tahminleri_kaydet', grup_id=grup.id) }}">
+
+{% for s in lig_sekmeleri %}
+<div class="lig-panel" data-panel="{{ s.kod }}" {% if s.kod != varsayilan_sekme %}hidden{% endif %}>
+
+  {% if s.maclar %}
+
+  {% if s.hafta %}
+  <p style="font-size:0.8em; color:var(--muted); margin:0 0 12px;">{{ s.ad }} · Hafta {{ s.hafta }}</p>
+  {% endif %}
+
+  {% for mac in s.maclar %}
+
+    <div class="match" style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #e2e8f0;">
+
+    <div class="teams">
+
+    <span>
+
+    {% set ev_fallback = takim_logo_url(mac.ev_sahibi) %}
+    {% set ev_src = mac.ev_logo or ev_fallback %}
+    {% if ev_src %}
+    <img
+    loading="lazy"
+    class="logo"
+    src="{{ ev_src }}"
+    style="width: 24px; height: 24px; vertical-align: middle; margin-right: 5px;"
+    {% if ev_fallback and ev_fallback != ev_src %}onerror="this.onerror=null;this.src='{{ ev_fallback }}';"{% endif %}
+    >
+    {% endif %}
+
+    {{ mac.ev_sahibi }}
+
+    </span>
+
+    <span>
+    {% if mac.bitti_mi() %}
+    {{ mac.ev_skor }} - {{ mac.deplasman_skor }}
+    {% else %}
+    VS
+    {% endif %}
+    </span>
+
+    <span>
+
+    {{ mac.deplasman }}
+
+    {% set dep_fallback = takim_logo_url(mac.deplasman) %}
+    {% set dep_src = mac.deplasman_logo or dep_fallback %}
+    {% if dep_src %}
+    <img
+    loading="lazy"
+    class="logo"
+    src="{{ dep_src }}"
+    style="width: 24px; height: 24px; vertical-align: middle; margin-left: 5px;"
+    {% if dep_fallback and dep_fallback != dep_src %}onerror="this.onerror=null;this.src='{{ dep_fallback }}';"{% endif %}
+    >
+    {% endif %}
+
+    </span>
+
+    </div>
+
+    <p style="font-size: 0.85em; color: #64748b; margin-top: 5px;">
+    🕒
+    {% if mac.baslangic %}
+    {{ mac.baslangic | tr_saat }}
+    {% else %}
+    Tarih Belirtilmemiş
+    {% endif %}
+    </p>
+
+    {% set t = tahminler.get(mac.id) %}
+
+    {% if mac.oynanabilir_mi() %}
+
+    <div class="grid" style="display: flex; gap: 10px; margin-bottom: 10px;">
+
+    <div style="flex: 1;">
+    <label style="font-size: 0.8em;">Ev Sahibi</label>
+    <input
+    type="number"
+    min="0"
+    name="ev_skor_{{ mac.id }}"
+    value="{{ t.ev_skor if t else '' }}"
+    class="form-control"
+    >
+    </div>
+
+    <div style="flex: 1;">
+    <label style="font-size: 0.8em;">Deplasman</label>
+    <input
+    type="number"
+    min="0"
+    name="deplasman_skor_{{ mac.id }}"
+    value="{{ t.deplasman_skor if t else '' }}"
+    class="form-control"
+    >
+    </div>
+
+    </div>
+
+    {% if t %}
+    <p style="font-size:0.8em; color:var(--muted); margin-top:-8px;">Mevcut tahminin: <strong>{{ t.ev_skor }} - {{ t.deplasman_skor }}</strong> (değiştirip tekrar kaydedebilirsin)</p>
+    {% endif %}
+
+    {% else %}
+
+    <div class="match-info">
+    {% if t %}
+    <p>🎯 Tahmininiz: <strong>{{ t.ev_skor }} - {{ t.deplasman_skor }}</strong> | Puan: <strong>{{ t.puan }}</strong></p>
+    {% else %}
+    <p>❌ Bu maç için tahmin yapılmadı.</p>
+    {% endif %}
+    <p>🔒 Tahmin kapandı.</p>
+    </div>
+
+    {% endif %}
+
+    {% set mac_tahminleri = grup_tahmin_matrisi.get(mac.id, {}) if grup_tahmin_matrisi else {} %}
+    {% set digerleri = members | rejectattr('kullanici_id', 'equalto', current_user.id) | list %}
+    {% if digerleri %}
+    <details class="diger-tahminler">
+      <summary>👥 Diğer üyelerin tahminleri ({{ digerleri | selectattr('kullanici_id', 'in', mac_tahminleri.keys() | list) | list | length }}/{{ digerleri|length }} tahmin yaptı)</summary>
+      <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px;">
+        {% for member in digerleri %}
+          {% set member_tahmin = mac_tahminleri.get(member.kullanici_id) %}
+          <div style="font-size: 0.85em; display: flex; justify-content: space-between; background: #f8fafc; padding: 6px 10px; border-radius: 6px;">
+            <span>{{ member.kullanici.kullanici_adi }}</span>
+            <span>
+              {% if member_tahmin %}
+                {% if mac.basladi_mi() %}
+                  <strong>{{ member_tahmin.ev_skor }} - {{ member_tahmin.deplasman_skor }}</strong>
+                  {% if mac.bitti_mi() %}
+                    <span style="color: #16a34a; margin-left: 5px;">(+{{ member_tahmin.puan }} Puan)</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color: #94a3b8; font-style: italic;">Gizli (maç başlayınca görünecek)</span>
+                {% endif %}
+              {% else %}
+                <span style="color: #cbd5e1;">Tahmin yapmadı</span>
+              {% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    </div>
+
+  {% endfor %}
+
+  {% else %}
+  <div class="lig-bos">
+    <p style="margin:0; font-weight:600;">Bu hafta {{ s.ad }} maçı yok.</p>
+    {% if s.sonraki_mac %}
+    <p style="margin:4px 0 0; font-size:0.85em; color:var(--muted);">Sıradaki maç: {{ s.sonraki_mac | tr_saat }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endfor %}
+
+{% if oynanabilir_mac_var %}
+  <button type="submit" class="btn btn-primary" style="width:100%; padding:14px; font-size:16px; margin-top:8px;">
+    ✅ Tüm Tahminleri Kaydet
+  </button>
+{% endif %}
+
+</form>
+
+{% else %}
+  <p class="text-muted">Bu hafta için planlanmış maç bulunamadı.</p>
+{% endif %}
+
+</div>
+
+<style>
+.lig-sekmeler{display:flex; gap:8px; margin:4px 0 18px; flex-wrap:wrap;}
+.lig-sekme{flex:1 1 0; min-width:0; padding:10px 8px; border:1px solid #e2e8f0; border-radius:10px;
+  background:#f8fafc; color:#334155; font-weight:600; font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;}
+.lig-sekme.aktif{background:var(--navy); color:#fff; border-color:var(--navy);}
+.lig-sekme-sayi{font-size:12px; padding:1px 7px; border-radius:999px; background:rgba(100,116,139,.15);}
+.lig-sekme.aktif .lig-sekme-sayi{background:var(--gold); color:#1f2937;}
+.lig-bos{padding:18px; text-align:center; background:#f8fafc; border-radius:10px; border:1px dashed #e2e8f0;}
+.diger-tahminler{margin-top:12px; border-top:1px dashed #eaecf0; padding-top:10px;}
+.diger-tahminler summary{cursor:pointer; font-size:0.85em; font-weight:600; color:#475569; list-style:none;}
+.diger-tahminler summary::-webkit-details-marker{display:none;}
+.diger-tahminler summary::before{content:"▸ "; display:inline-block; transition:transform .15s;}
+.diger-tahminler[open] summary::before{transform:rotate(90deg);}
+@media (max-width:480px){ .lig-sekme{font-size:12.5px; padding:9px 4px;} }
+</style>
+
+<script>
+(function(){
+  var butonlar = document.querySelectorAll('.lig-sekme');
+  var paneller = document.querySelectorAll('.lig-panel');
+  function sec(kod){
+    butonlar.forEach(function(b){ var a = b.dataset.sekme === kod; b.classList.toggle('aktif', a); b.setAttribute('aria-selected', a); });
+    paneller.forEach(function(p){ p.hidden = p.dataset.panel !== kod; });
+    try { sessionStorage.setItem('ligSekme_{{ grup.id }}', kod); } catch(e) {}
+  }
+  butonlar.forEach(function(b){ b.addEventListener('click', function(){ sec(b.dataset.sekme); }); });
+  try {
+    var kayitli = sessionStorage.getItem('ligSekme_{{ grup.id }}');
+    if (kayitli && document.querySelector('.lig-panel[data-panel="' + kayitli + '"]')) sec(kayitli);
+  } catch(e) {}
+})();
+</script>
+
+
+{% if su_anki_hafta_siralamasi %}
+<div class="card">
+
+<h2>
+🔥 Bu Haftanın Lider Tablosu
+{% if hafta_basi and hafta_sonu %}
+<span style="font-size:0.6em; color:var(--muted); font-weight:400;">({{ hafta_basi | tr_saat("%d.%m") }} — {{ hafta_sonu | tr_saat("%d.%m") }})</span>
+{% endif %}
+</h2>
+
+<p style="font-size:0.85em; color:var(--muted); margin-top:-8px;">
+  Şampiyonlar Ligi, Süper Lig ve Uluslar Ligi (Türkiye) maçları birlikte, bu haftanın puanlarını gösterir — her hafta sıfırdan başlar.
+  Tüm geçmiş haftaları görmek için <a href="{{ url_for('grup_haftalik_liderlik', grup_id=grup.id) }}">Haftalık Zirve Listesi</a>'ne bak.
+</p>
+
+<table class="table">
+<tr><th>#</th><th>Kullanıcı</th><th>Bu Haftaki Puan</th></tr>
+{% for row in su_anki_hafta_siralamasi %}
+<tr>
+<td>
+{{ loop.index }}
+{% if loop.index == 1 %} 👑{% endif %}
+{% if loop.index == loop.length and loop.length > 1 %} 💩{% endif %}
+</td>
+<td>
+{{ row.user.kullanici_adi }}
+{% if loop.index == 1 %}<span class="badge" style="background:#fff4d6;color:#8a6d00;">Haftanın Kralı</span>{% endif %}
+{% if loop.index == loop.length and loop.length > 1 %}<span class="badge" style="background:#fde2e1;color:#9b1c1c;">Haftanın Cenabeti</span>{% endif %}
+</td>
+<td><strong>{{ row.points }}</strong></td>
+</tr>
+{% endfor %}
+</table>
+
+</div>
+{% endif %}
+
+
+<div class="card">
+
+<h2>
+🏆 Sezonluk Genel Sıralama
+</h2>
+
+<table class="table">
+
+<tr>
+<th>#</th>
+<th>Kullanıcı</th>
+<th>Toplam Puan</th>
+</tr>
+
+{% for row in leaderboard %}
+
+<tr>
+
+<td>
+{{ loop.index }}
+{% if loop.index == 1 %} 👑{% endif %}
+{% if loop.index == loop.length and loop.length > 1 %} 💩{% endif %}
+</td>
+
+<td>
+{{ row.user.kullanici_adi }}
+{% if loop.index == 1 %}<span class="badge" style="background:#fff4d6;color:#8a6d00;">Sezonun Kralı</span>{% endif %}
+{% if loop.index == loop.length and loop.length > 1 %}<span class="badge" style="background:#fde2e1;color:#9b1c1c;">Sezonun Cenabeti</span>{% endif %}
+</td>
+
+<td>
+<strong>
+{{ row.points }}
+</strong>
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
+{% endblock %}
